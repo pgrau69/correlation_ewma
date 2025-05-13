@@ -1,0 +1,58 @@
+//@version=5
+indicator("EWMA Corr EURUSD–DXY (Amplified View)", overlay=false)
+
+//===============================
+// Parámetros de usuario
+//===============================
+alpha = input.float(0.94,   "Lambda (EWMA)",           step=0.01)
+src   = input.source(close, "Fuente de datos")
+sym2  = "DXY"
+band  = input.float(0.8,    "Umbral Alta Corr.",       step=0.05)
+amp   = input.float(2.0,    "Factor de Amplificación", step=0.1)
+
+//===============================
+// Variables persistentes
+//===============================
+var float mu_x   = na
+var float mu_y   = na
+var float var_x  = na
+var float var_y  = na
+var float cov_xy = na
+
+//===============================
+// Lectura de series
+//===============================
+x = src
+y = request.security(sym2, timeframe.period, src)
+
+//===============================
+// EWMA de media, varianza y covarianza
+// con nz() para inicializar sin na
+//===============================
+mu_x   := nz(mu_x[1], x)   * alpha + (1 - alpha) * x
+mu_y   := nz(mu_y[1], y)   * alpha + (1 - alpha) * y
+var_x  := nz(var_x[1], 0)  * alpha + (1 - alpha) * math.pow(x - mu_x, 2)
+var_y  := nz(var_y[1], 0)  * alpha + (1 - alpha) * math.pow(y - mu_y, 2)
+cov_xy := nz(cov_xy[1], 0) * alpha + (1 - alpha) * (x - mu_x) * (y - mu_y)
+
+//===============================
+// Correlación EWMA y escalado
+//===============================
+ewmaCorr   = cov_xy / math.sqrt(var_x * var_y)
+scaledCorr = ewmaCorr * amp
+
+//===============================
+// Dibujar en pantalla
+//===============================
+plot(scaledCorr, "EWMA Corr", color=color.orange, linewidth=2)
+hline(0,         "Zero Line",  color=color.gray)
+
+// Bandas escaladas
+h0 = hline(-band * amp, "", color=color.new(color.red,   90))
+h1 = hline( band * amp, "", color=color.new(color.green, 90))
+fill(h0, h1, color=color.new(color.teal, 80))
+
+// Label con el factor de amplificación
+var label lb = na
+if barstate.islast
+    lb := label.new(bar_index, scaledCorr, "Amp x" + str.tostring(amp), xloc.bar_index, yloc.price, color.new(color.white, 80), label.style_label_left, color.black, size.tiny)
