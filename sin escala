@@ -1,0 +1,54 @@
+//@version=5
+indicator("EWMA Corr EURUSD–DXY", overlay=false)
+
+//===============================
+// Parámetros de usuario
+//===============================
+alpha = input.float(0.94, "Lambda (EWMA)", step=0.01)
+src   = input.source(close, "Fuente de datos")
+sym2  = "DXY"
+
+// Ajuste manual de escala Y
+yMin = input.float(-1.0, "Escala Y mínima")
+yMax = input.float( 1.0, "Escala Y máxima")
+
+//===============================
+// Variables persistentes
+//===============================
+var float mu_x   = na
+var float mu_y   = na
+var float var_x  = na
+var float var_y  = na
+var float cov_xy = na
+
+//===============================
+// Lectura de series
+//===============================
+x = src
+y = request.security(sym2, timeframe.period, src)
+
+//===============================
+// Cálculo EWMA de media, varianza y covarianza
+// Usamos nz() para inicializar en la primera vela
+//===============================
+mu_x   := nz(mu_x[1], x)   * alpha + (1 - alpha) * x
+mu_y   := nz(mu_y[1], y)   * alpha + (1 - alpha) * y
+var_x  := nz(var_x[1], 0)  * alpha + (1 - alpha) * math.pow(x - mu_x, 2)
+var_y  := nz(var_y[1], 0)  * alpha + (1 - alpha) * math.pow(y - mu_y, 2)
+cov_xy := nz(cov_xy[1], 0) * alpha + (1 - alpha) * (x - mu_x) * (y - mu_y)
+
+//===============================
+// Correlación EWMA
+//===============================
+ewmaCorr = cov_xy / math.sqrt(var_x * var_y)
+
+//===============================
+// Dibujar en pantalla
+//===============================
+plot(ewmaCorr, "EWMA Corr", color=color.orange, linewidth=2)
+// Línea cero para referencia
+hline(0, "Zero Line", color=color.gray)
+
+// Barras invisibles para forzar escala Y
+hline(yMin, "", color=color.new(color.gray, 100))
+hline(yMax, "", color=color.new(color.gray, 100))
